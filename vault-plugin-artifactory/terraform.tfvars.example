@@ -1,0 +1,20 @@
+vault_token                = "replace-me-with-a-vault-token"
+artifactory_access_token   = "replace-me-with-a-jfrog-admin-token"
+vault_ssh_private_key_path = "/absolute/path/to/vault-private-key.pem"
+
+# Optional overrides. By default these values are read from ../terraform.tfstate.
+# vault_addr       = "https://vault.example.com"
+# vault_ssh_host   = "203.0.113.10"
+# artifactory_url  = "https://artifactory.example.com"
+# plugin_target_arch = "amd64"
+
+plugin_mount_path = "artifactory"
+
+bypass_artifactory_tls_verification = false
+use_expiring_tokens                 = false
+allow_scope_override                = false
+revoke_on_delete                    = false
+rotate_admin_token                  = false
+
+# Optional dynamic username template from the plugin docs.
+# username_template = "v_{{.DisplayName}}_{{.RoleName}}_{{random 10}}_{{unix_time}}"

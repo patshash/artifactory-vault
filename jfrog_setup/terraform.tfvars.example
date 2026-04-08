@@ -1,0 +1,7 @@
+jfrog_url          = "https://artifactory.example.com/"
+jfrog_access_token = "replace-me-with-a-jfrog-admin-token"
+
+oidc_configuration_name = "vault"
+identity_mapping_name   = "vault-azp-username"
+azp_claim_match         = "vault-oidc-test-user"
+validation_user_email   = "vault-oidc-test-user@example.com"

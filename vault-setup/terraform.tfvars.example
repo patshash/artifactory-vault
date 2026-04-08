@@ -1,0 +1,14 @@
+vault_addr            = "https://vault.example.com"
+vault_token           = "replace-me-with-a-vault-token"
+vault_namespace       = ""
+oidc_issuer_base_url  = "https://vault.example.com"
+
+oidc_key_name                 = "jfrog-identity-signing-key"
+role_name                     = "jfrog-token-role"
+application_audience          = "artifactory.example.com"
+userpass_auth_path            = "userpass"
+validation_username           = "vault-oidc-test-user"
+token_ttl_seconds             = 900
+key_algorithm                 = "RS256"
+key_rotation_period_seconds   = 86400
+key_verification_ttl_seconds  = 604800

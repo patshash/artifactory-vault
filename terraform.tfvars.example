@@ -1,0 +1,20 @@
+environment_name = "sandpit"
+route53_zone_name = "example.com"
+ssh_key_name      = "replace-me-with-your-ec2-key-pair"
+
+# Leave null to auto-detect the current public IP and lock ingress to /32.
+operator_cidr = null
+
+vault_dns_label       = "vault"
+artifactory_dns_label = "artifactory"
+
+instance_architecture = "amd64"
+
+# Optional overrides.
+# vault_instance_type       = "t3.small"
+# artifactory_instance_type = "t3.large"
+
+# Optional tag additions.
+common_tags = {
+  Owner = "example-owner"
+}

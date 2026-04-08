@@ -1,0 +1,17 @@
+.DS_Store
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+/vault-setup/terraform.tfvars
+/jfrog_setup/terraform.tfvars
+vault-init
+/vault-init
+/.terraform.lock.hcl
+implementation-plan.md

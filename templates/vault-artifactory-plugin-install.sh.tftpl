@@ -1,0 +1,42 @@
+#!/bin/bash
+set -euxo pipefail
+
+PLUGIN_DIRECTORY="${vault_plugin_directory}"
+PLUGIN_ARCH="${vault_plugin_arch}"
+LATEST_RELEASE_API="https://api.github.com/repos/jfrog/vault-plugin-secrets-artifactory/releases/latest"
+
+if ! command -v jq >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update
+  apt-get install -y ca-certificates curl jq
+fi
+
+install -o vault -g vault -m 0755 -d "$${PLUGIN_DIRECTORY}"
+
+TMP_DIR="$(mktemp -d)"
+cleanup() {
+  rm -rf "$${TMP_DIR}"
+}
+trap cleanup EXIT
+
+RELEASE_JSON="$(curl -fsSL "$${LATEST_RELEASE_API}")"
+PLUGIN_TAG="$(echo "$${RELEASE_JSON}" | jq -r '.tag_name')"
+PLUGIN_VERSION="$${PLUGIN_TAG#v}"
+PLUGIN_ASSET="artifactory-secrets-plugin_$${PLUGIN_VERSION}_linux_$${PLUGIN_ARCH}"
+CHECKSUMS_FILE="artifactory-secrets-plugin_$${PLUGIN_VERSION}.checksums.txt"
+DOWNLOAD_BASE_URL="https://github.com/jfrog/vault-plugin-secrets-artifactory/releases/download/$${PLUGIN_TAG}"
+
+curl -fsSL -o "$${TMP_DIR}/$${PLUGIN_ASSET}" "$${DOWNLOAD_BASE_URL}/$${PLUGIN_ASSET}"
+curl -fsSL -o "$${TMP_DIR}/$${CHECKSUMS_FILE}" "$${DOWNLOAD_BASE_URL}/$${CHECKSUMS_FILE}"
+
+EXPECTED_SHA="$(awk -v asset="$${PLUGIN_ASSET}" '$2 == asset { print $1 }' "$${TMP_DIR}/$${CHECKSUMS_FILE}")"
+if [ -z "$${EXPECTED_SHA}" ]; then
+  echo "Failed to locate checksum for $${PLUGIN_ASSET}" >&2
+  exit 1
+fi
+
+printf '%s  %s\n' "$${EXPECTED_SHA}" "$${TMP_DIR}/$${PLUGIN_ASSET}" | sha256sum -c -
+
+install -o vault -g vault -m 0755 "$${TMP_DIR}/$${PLUGIN_ASSET}" "$${PLUGIN_DIRECTORY}/artifactory-secrets-plugin"
+printf '%s\n' "$${PLUGIN_TAG}" >"$${PLUGIN_DIRECTORY}/artifactory-secrets-plugin.version"
+chown vault:vault "$${PLUGIN_DIRECTORY}/artifactory-secrets-plugin.version"
