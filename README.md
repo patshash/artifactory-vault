@@ -1,4 +1,4 @@
-# Artifactory + Vault sandpit
+# Artifactory + Vault OIDC Token Exchange Sandpit
 
 This repository provisions a small AWS sandpit and then configures Vault and JFrog so JFrog can trust Vault-issued identity tokens.
 
