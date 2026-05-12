@@ -11,6 +11,8 @@ override.tf.json
 *_override.tf.json
 /vault-setup/terraform.tfvars
 /jfrog_setup/terraform.tfvars
+/claude-wif/terraform.tfvars
+/claude-wif/PLAN.md
 vault-init
 /vault-init
 /.terraform.lock.hcl

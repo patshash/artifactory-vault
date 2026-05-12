@@ -1,0 +1,7 @@
+vault_addr  = "https://vault.example.com"
+vault_token = "replace-me-with-a-vault-token"
+
+role_name            = "claude-token-role"
+application_audience = "https://api.anthropic.com"
+token_ttl_seconds    = 3600
+validation_username  = "vault-claude-test-user"

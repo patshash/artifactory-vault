@@ -119,6 +119,11 @@ output "validation_vault_password" {
   sensitive   = true
 }
 
+output "vault_identity_oidc_key_name" {
+  description = "Name of the OIDC signing key used to sign identity tokens."
+  value       = vault_identity_oidc_key.application.name
+}
+
 output "vault_identity_token_discovery_endpoint" {
   description = "Public discovery document for Vault identity tokens."
   value       = "${local.oidc_issuer}/.well-known/openid-configuration"

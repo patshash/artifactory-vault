@@ -10,6 +10,7 @@ This repository provisions a small AWS sandpit and then configures Vault and JFr
 | `vault-setup/` | Vault identity token issuer, signing key, and OIDC role configuration |
 | `vault-plugin-artifactory/` | Standalone installer for the JFrog Artifactory Vault secrets plugin |
 | `jfrog_setup/` | JFrog OIDC integration and identity mapping for Vault-issued tokens |
+| `claude-wif/` | Anthropic Claude WIF integration for Vault-issued identity tokens |
 | `scripts/` | Helper scripts for end-to-end validation and operator workflows |
 | `templates/` | User-data templates used to bootstrap the EC2 instances |
 
@@ -72,6 +73,18 @@ The JFrog stack uses the `jfrog/platform` provider to configure:
 
 By default it reads `../vault-setup/terraform.tfstate` to discover the live Vault issuer and audience. This stack assumes a working JFrog Platform installation and is not compatible with Artifactory Open Source.
 
+### `claude-wif/`
+
+The Claude WIF stack configures Vault Workload Identity Federation for the Anthropic Claude API. It creates:
+
+- a new OIDC role (`claude-token-role`) with audience `https://api.anthropic.com`
+- a Vault policy and validation user for testing
+- optionally provisions Anthropic-side resources (service account, federation issuer, federation rule) via the Admin API
+
+The pattern is the same as the JFrog integration: Vault is the OIDC identity provider, Anthropic is the relying party. A workload authenticates to Vault, receives a signed JWT, and exchanges it with Anthropic for a short-lived Claude API access token — no static API keys required.
+
+By default it reads `../vault-setup/terraform.tfstate` to discover the signing key name, userpass mount accessor, and OIDC issuer URL.
+
 ## Sensitive files
 
 Variable examples are provided and need to be updated:
@@ -80,6 +93,7 @@ Variable examples are provided and need to be updated:
 - `vault-setup/terraform.tfvars.example`
 - `vault-plugin-artifactory/terraform.tfvars.example`
 - `jfrog_setup/terraform.tfvars.example`
+- `claude-wif/terraform.tfvars.example`
 
 ## Prerequisites
 
@@ -210,9 +224,41 @@ terraform -chdir=jfrog_setup plan -out jfrog-setup.tfplan
 terraform -chdir=jfrog_setup apply jfrog-setup.tfplan
 ```
 
-## Validation script
+### 6. Configure Claude WIF
 
-Use `scripts/validate-vault-jfrog.sh` to validate the end-to-end flow by:
+Create a local tfvars file:
+
+```bash
+cp claude-wif/terraform.tfvars.example claude-wif/terraform.tfvars
+```
+
+Populate at least:
+
+- `vault_addr`
+- `vault_token`
+
+Complete the Anthropic Console setup manually first (see [`claude-wif/anthropic-console-setup.md`](claude-wif/anthropic-console-setup.md)).
+
+Then run:
+
+```bash
+terraform -chdir=claude-wif init
+terraform -chdir=claude-wif plan -out claude-wif.tfplan
+terraform -chdir=claude-wif apply claude-wif.tfplan
+```
+
+After apply, retrieve the validation-script credentials with:
+
+```bash
+terraform -chdir=claude-wif output validation_vault_username
+terraform -chdir=claude-wif output -raw validation_vault_password
+```
+
+## Validation scripts
+
+### JFrog validation
+
+Use `scripts/validate-vault-jfrog.sh` to validate the end-to-end JFrog flow by:
 
 1. authenticating to Vault
 2. requesting an identity token from `identity/oidc/token/<role>`
@@ -269,7 +315,45 @@ Requirements for the script:
 - `python3`
 - `node` / `npx`
 
-## End-to-end auth flow
+### Claude validation
+
+Use `scripts/validate-vault-claude.sh` to validate the end-to-end Claude WIF flow by:
+
+1. authenticating to Vault
+2. requesting an identity token from `identity/oidc/token/claude-token-role`
+3. exchanging that token with Anthropic via WIF (`jwt-bearer` grant)
+4. calling the Claude Messages API with the exchanged access token
+
+Required inputs:
+
+- `VAULT_ADDR` or `--vault-addr`
+- `ANTHROPIC_ORGANIZATION_ID` or `--organization-id`
+- `ANTHROPIC_SERVICE_ACCOUNT_ID` or `--service-account-id`
+- `ANTHROPIC_FEDERATION_RULE_ID` or `--federation-rule-id`
+- either `VAULT_TOKEN` / `--vault-token` or a Vault username/password pair
+
+Example:
+
+```bash
+export VAULT_ADDR="https://vault.example.com"
+export VAULT_USERNAME="vault-claude-test-user"
+export ANTHROPIC_ORGANIZATION_ID="org_..."
+export ANTHROPIC_SERVICE_ACCOUNT_ID="svac_..."
+export ANTHROPIC_FEDERATION_RULE_ID="fdrl_..."
+export ANTHROPIC_WORKSPACE_ID="wrkspc_..."  # required when rule spans multiple workspaces
+
+./scripts/validate-vault-claude.sh
+```
+
+Requirements for the script:
+
+- `bash`
+- `curl`
+- `python3`
+
+## End-to-end auth flows
+
+### JFrog
 
 Once all stacks are applied:
 
@@ -277,6 +361,15 @@ Once all stacks are applied:
 2. request a Vault identity token from `identity/oidc/token/jfrog-token-role`
 3. exchange that token with JFrog at `/access/api/v1/oidc/token`
 4. receive a JFrog access token for the username derived from the Vault token `azp` claim
+
+### Claude
+
+Once the `claude-wif/` stack is applied:
+
+1. authenticate to Vault with a userpass user that has an associated entity
+2. request a Vault identity token from `identity/oidc/token/claude-token-role`
+3. exchange that token with Anthropic at `https://api.anthropic.com/v1/oauth/token` using the `jwt-bearer` grant type
+4. receive a short-lived `sk-ant-oat01-...` access token scoped to the configured service account
 
 
 ### Install the Artifactory Vault plugin **OPTIONAL**
@@ -309,6 +402,7 @@ Destroy in reverse order:
 
 ```bash
 terraform -chdir=vault-plugin-artifactory destroy
+terraform -chdir=claude-wif destroy
 terraform -chdir=jfrog_setup destroy
 terraform -chdir=vault-setup destroy
 terraform destroy
