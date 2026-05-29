@@ -1,0 +1,27 @@
+# --- Vault connection ---
+vault_addr  = "https://vault.example.com"
+vault_token = "hvs.EXAMPLE"
+# vault_namespace = ""
+
+# --- Vault SPIFFE configuration ---
+spiffe_trust_domain = "vault.example.com"
+# spiffe_mount_path   = "spiffe"
+# spiffe_role_name    = "azure-wif"
+# token_ttl           = "10m"
+
+# --- Workload entities ---
+# workload_entity_names = ["billing-processor", "inventory-sync", "reporting-engine"]
+
+# --- Azure configuration ---
+azure_tenant_id            = "00000000-0000-0000-0000-000000000000"
+azure_subscription_id      = "00000000-0000-0000-0000-000000000000"
+azure_app_client_id        = "00000000-0000-0000-0000-000000000000"
+azure_resource_group_name  = "rg-vault-spiffe-wif"
+azure_storage_account_name = "vaultspiffewif"
+# azure_location           = "australiaeast"
+
+# --- Per-workload Azure App Registrations (staging/prod) ---
+azure_app_registrations = {
+  "a00123-staging" = "00000000-0000-0000-0000-000000000000"
+  "a00123-prod"    = "00000000-0000-0000-0000-000000000000"
+}

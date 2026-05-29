@@ -17,3 +17,7 @@ vault-init
 /vault-init
 /.terraform.lock.hcl
 implementation-plan.md
+azure/.terraform.lock.hcl
+azure/AZURE-PLAN.md
+azure/original-mapping.md
+azure/AZURE.md
