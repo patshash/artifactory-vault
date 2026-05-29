@@ -11,6 +11,7 @@ This repository provisions a small AWS sandpit and then configures Vault and JFr
 | `vault-plugin-artifactory/` | Standalone installer for the JFrog Artifactory Vault secrets plugin |
 | `jfrog_setup/` | JFrog OIDC integration and identity mapping for Vault-issued tokens |
 | `claude-wif/` | Anthropic Claude WIF integration for Vault-issued identity tokens |
+| `azure/` | Azure Workload Identity Federation using Vault SPIFFE JWT-SVIDs |
 | `scripts/` | Helper scripts for end-to-end validation and operator workflows |
 | `templates/` | User-data templates used to bootstrap the EC2 instances |
 
@@ -85,6 +86,25 @@ The pattern is the same as the JFrog integration: Vault is the OIDC identity pro
 
 By default it reads `../vault-setup/terraform.tfstate` to discover the signing key name, userpass mount accessor, and OIDC issuer URL.
 
+### `azure/`
+
+The Azure WIF stack configures Workload Identity Federation between Vault and Microsoft Azure using the **SPIFFE secrets engine**. Unlike the JFrog and Claude integrations (which use Vault's identity OIDC roles), this stack uses Vault's dedicated SPIFFE engine to mint JWT-SVIDs with structured SPIFFE ID subjects.
+
+It creates:
+
+- a SPIFFE secrets engine mount with trust domain configuration
+- a SPIFFE role that mints JWT-SVIDs with custom claims (`sub`, `customer_metadata`)
+- Vault entities with auto-parsed metadata (workload ID, environment, Azure client ID)
+- userpass accounts and entity aliases for each workload
+- Azure Federated Identity Credentials on per-environment App Registrations
+- Azure Storage Account with RBAC assignments for validation
+
+Entity names follow the convention `<workload_id>-<environment>` (e.g., `a00123-dev`, `a00123-prod`), producing SPIFFE IDs like `spiffe://vault.example.com/workload/dev/a00123`.
+
+Each environment can have its own Azure App Registration for isolation, or share a single registration. The JWT-SVID includes a `customer_metadata` block with `environment`, `workload_id`, and `azure_client_id` for downstream consumers.
+
+By default it reads `../vault-setup/terraform.tfstate` for the userpass auth mount accessor.
+
 ## Sensitive files
 
 Variable examples are provided and need to be updated:
@@ -94,6 +114,7 @@ Variable examples are provided and need to be updated:
 - `vault-plugin-artifactory/terraform.tfvars.example`
 - `jfrog_setup/terraform.tfvars.example`
 - `claude-wif/terraform.tfvars.example`
+- `azure/terraform.tfvars.example`
 
 ## Prerequisites
 
@@ -254,6 +275,41 @@ terraform -chdir=claude-wif output validation_vault_username
 terraform -chdir=claude-wif output -raw validation_vault_password
 ```
 
+### 7. Configure Azure WIF
+
+Create a local tfvars file:
+
+```bash
+cp azure/terraform.tfvars.example azure/terraform.tfvars
+```
+
+Populate at least:
+
+- `vault_addr`
+- `vault_token`
+- `spiffe_trust_domain`
+- `azure_tenant_id`
+- `azure_subscription_id`
+- `azure_app_client_id`
+- `azure_resource_group_name`
+- `azure_storage_account_name`
+
+Optionally configure per-environment App Registrations in `azure_app_registrations`.
+
+Then run:
+
+```bash
+terraform -chdir=azure init
+terraform -chdir=azure plan -out azure.tfplan
+terraform -chdir=azure apply azure.tfplan
+```
+
+After apply, retrieve the workload credentials with:
+
+```bash
+terraform -chdir=azure output -json workload_passwords
+```
+
 ## Validation scripts
 
 ### JFrog validation
@@ -351,6 +407,50 @@ Requirements for the script:
 - `curl`
 - `python3`
 
+### Azure validation
+
+Use `scripts/validate-vault-azure.sh` (bash) or `scripts/validate-vault-azure.py` (Python) to validate the end-to-end Azure WIF flow by:
+
+1. authenticating to Vault (userpass)
+2. minting a JWT-SVID from the SPIFFE engine
+3. exchanging the JWT-SVID with Microsoft Entra ID for an Azure access token
+4. calling the Azure Storage API to list containers
+
+Required inputs:
+
+- `VAULT_ADDR` or `--vault-addr`
+- `AZURE_TENANT_ID` or `--azure-tenant-id`
+- `AZURE_CLIENT_ID` or `--azure-client-id`
+- `AZURE_STORAGE_ACCOUNT` or `--storage-account`
+- either `VAULT_TOKEN` / `--vault-token` or a Vault username/password pair
+
+Example (bash):
+
+```bash
+export VAULT_ADDR="https://vault.example.com"
+export AZURE_TENANT_ID="00000000-0000-0000-0000-000000000000"
+
+./scripts/validate-vault-azure.sh \
+  --vault-username a00123-dev \
+  --azure-client-id <client-id> \
+  --storage-account vaultspiffewif
+```
+
+Example (Python):
+
+```bash
+source .venv/bin/activate  # pip install -r scripts/requirements.txt
+python scripts/validate-vault-azure.py \
+  --vault-username a00123-dev \
+  --azure-client-id <client-id> \
+  --storage-account vaultspiffewif
+```
+
+Requirements:
+
+- Bash script: `bash`, `curl`, `python3`
+- Python script: `requests`, `azure-identity`, `azure-storage-blob` (see `scripts/requirements.txt`)
+
 ## End-to-end auth flows
 
 ### JFrog
@@ -370,6 +470,15 @@ Once the `claude-wif/` stack is applied:
 2. request a Vault identity token from `identity/oidc/token/claude-token-role`
 3. exchange that token with Anthropic at `https://api.anthropic.com/v1/oauth/token` using the `jwt-bearer` grant type
 4. receive a short-lived `sk-ant-oat01-...` access token scoped to the configured service account
+
+### Azure
+
+Once the `azure/` stack is applied:
+
+1. authenticate to Vault with a workload userpass user (e.g., `a00123-dev`)
+2. mint a JWT-SVID from `spiffe/role/azure-wif/mintjwt`
+3. exchange the JWT-SVID with Microsoft Entra ID at `https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token` using `client_credentials` grant with federated credential
+4. receive an Azure access token scoped to the App Registration's RBAC permissions
 
 
 ### Install the Artifactory Vault plugin **OPTIONAL**
@@ -402,6 +511,7 @@ Destroy in reverse order:
 
 ```bash
 terraform -chdir=vault-plugin-artifactory destroy
+terraform -chdir=azure destroy
 terraform -chdir=claude-wif destroy
 terraform -chdir=jfrog_setup destroy
 terraform -chdir=vault-setup destroy
