@@ -1,6 +1,13 @@
 vault_addr  = "https://vault.example.com"
 vault_token = "replace-me-with-a-vault-token"
 
+# SPIFFE trust domain — typically your Vault hostname or organization domain
+trust_domain = "vault.example.com"
+
+# Optional: override the JWT issuer base URL if different from vault_addr
+# jwt_issuer_base_url = "https://vault.example.com"
+
+spiffe_mount_path    = "spiffe"
 role_name            = "claude-token-role"
 application_audience = "https://api.anthropic.com"
 token_ttl_seconds    = 3600
