@@ -47,7 +47,7 @@ Follow these steps in the [Claude Console](https://console.anthropic.com) to con
    - **Name**: `vault-claude-access`
    - **Issuer**: `vault-sandpit`
    - **Match conditions** (choose one):
-     - **Option A - CEL Claims Match** (recommended)
+     - **Option A - CEL Expression on Token claims ** (recommended)
        ```
        claims.metadata.claude_workspace == "wif-workspace"
        ```
