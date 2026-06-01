@@ -25,7 +25,7 @@ Optional:
   --vault-namespace / VAULT_NAMESPACE
   --vault-auth-path / VAULT_AUTH_PATH              Default: userpass
   --vault-role / VAULT_IDENTITY_ROLE               Default: claude-token-role
-  --spiffe-mount / VAULT_SPIFFE_MOUNT              Default: spiffe
+  --spiffe-mount / VAULT_SPIFFE_MOUNT              Default: spiffe-claude
   --audience / VAULT_SPIFFE_AUDIENCE               Default: https://api.anthropic.com
   --workspace-id / ANTHROPIC_WORKSPACE_ID
   --help
@@ -158,7 +158,7 @@ else:
 
 VAULT_AUTH_PATH="${VAULT_AUTH_PATH:-userpass}"
 VAULT_IDENTITY_ROLE="${VAULT_IDENTITY_ROLE:-claude-token-role}"
-VAULT_SPIFFE_MOUNT="${VAULT_SPIFFE_MOUNT:-spiffe}"
+VAULT_SPIFFE_MOUNT="${VAULT_SPIFFE_MOUNT:-spiffe-claude}"
 VAULT_SPIFFE_AUDIENCE="${VAULT_SPIFFE_AUDIENCE:-https://api.anthropic.com}"
 
 # --- Parse arguments ---

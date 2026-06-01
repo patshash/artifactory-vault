@@ -33,20 +33,20 @@ resource "vault_mount" "spiffe" {
 resource "vault_spiffe_secret_backend_config" "claude" {
   mount                      = vault_mount.spiffe.path
   trust_domain               = var.trust_domain
-  jwt_issuer_url             = var.jwt_issuer_base_url == "" ? var.vault_addr : var.jwt_issuer_base_url
+  jwt_issuer_url             = local.spiffe_issuer
   jwt_signing_algorithm      = var.jwt_signing_algorithm
-  key_lifetime               = "${var.key_lifetime_seconds}s"
+  key_lifetime               = var.key_lifetime
   jwt_oidc_compatibility_mode = true
 }
 
 resource "vault_spiffe_secret_backend_role" "claude" {
   mount = vault_mount.spiffe.path
   name  = var.role_name
-  ttl   = "${var.token_ttl_seconds}s"
+  ttl   = var.token_ttl
   template = jsonencode({
-    sub      = "spiffe://${var.trust_domain}/claude/{{identity.entity.aliases.${local.userpass_auth_mount_accessor}.name}}"
-    azp      = "{{identity.entity.aliases.${local.userpass_auth_mount_accessor}.name}}"
-    metadata = "{{identity.entity.metadata}}"
+    sub             = "spiffe://${var.trust_domain}/claude/{{identity.entity.aliases.${local.userpass_auth_mount_accessor}.name}}"
+    azp             = "{{identity.entity.aliases.${local.userpass_auth_mount_accessor}.name}}"
+    claude_workspace = "{{identity.entity.metadata.claude_workspace}}"
   })
   use_jti_claim = true
 }

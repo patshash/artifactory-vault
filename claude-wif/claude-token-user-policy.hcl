@@ -1,3 +1,3 @@
-path "spiffe/role/claude-token-role/mintjwt" {
+path "spiffe-claude/role/claude-token-role/mintjwt" {
   capabilities = ["update"]
 }
