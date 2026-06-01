@@ -422,8 +422,13 @@ storage_response="$(
 )"
 
 info "Azure Storage API call succeeded."
-printf '    Response (first 500 chars):\n'
-printf '      %s\n' "$(printf '%s' "${storage_response}" | head -c 500)"
+if command -v xmllint &>/dev/null; then
+  printf '    Response:\n'
+  printf '%s' "${storage_response}" | xmllint --format - 2>/dev/null | sed 's/^/      /'
+else
+  printf '    Response (first 500 chars):\n'
+  printf '      %s\n' "$(printf '%s' "${storage_response}" | head -c 500)"
+fi
 
 echo ""
 info "Validation complete. The full WIF flow is working:"
