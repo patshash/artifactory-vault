@@ -1,31 +1,41 @@
-output "vault_identity_token_role_name" {
-  description = "Vault OIDC role name for Claude identity tokens."
-  value       = vault_identity_oidc_role.claude.name
+output "spiffe_mount_path" {
+  description = "Path where the SPIFFE secrets engine is mounted."
+  value       = vault_mount.spiffe.path
 }
 
-output "vault_identity_token_audience" {
-  description = "Audience configured for the issued Claude identity tokens."
-  value       = vault_identity_oidc_role.claude.client_id
+output "spiffe_role_name" {
+  description = "SPIFFE role name for Claude JWT-SVIDs."
+  value       = vault_spiffe_secret_backend_role.claude.name
 }
 
-output "vault_identity_token_endpoint" {
-  description = "Endpoint applications call to have Vault issue a Claude identity token."
-  value       = "${local.vault_api_base}/identity/oidc/token/${vault_identity_oidc_role.claude.name}"
+output "spiffe_mintjwt_endpoint" {
+  description = "Endpoint applications call to mint a Claude JWT-SVID (POST with audience parameter)."
+  value       = "${local.vault_api_base}/${vault_mount.spiffe.path}/role/${vault_spiffe_secret_backend_role.claude.name}/mintjwt"
 }
 
-output "vault_identity_token_issuer" {
-  description = "Issuer advertised in Vault identity tokens and discovery metadata."
-  value       = local.vault_identity_token_issuer
+output "spiffe_jwt_audience" {
+  description = "Audience value to pass to the mintjwt endpoint for Anthropic."
+  value       = var.application_audience
 }
 
-output "vault_identity_token_discovery_endpoint" {
-  description = "Public discovery document for Vault identity tokens."
-  value       = "${local.vault_identity_token_issuer}/.well-known/openid-configuration"
+output "spiffe_jwt_issuer" {
+  description = "Issuer advertised in SPIFFE JWT-SVIDs and discovery metadata."
+  value       = local.spiffe_issuer
 }
 
-output "vault_identity_token_jwks_endpoint" {
-  description = "Public JWKS endpoint Anthropic uses to validate Vault identity tokens."
-  value       = "${local.vault_identity_token_issuer}/.well-known/keys"
+output "spiffe_discovery_endpoint" {
+  description = "Public OIDC discovery document for the SPIFFE secrets engine."
+  value       = "${local.spiffe_issuer}/.well-known/openid-configuration"
+}
+
+output "spiffe_jwks_endpoint" {
+  description = "Public JWKS endpoint Anthropic uses to validate SPIFFE JWT-SVIDs."
+  value       = "${local.spiffe_issuer}/.well-known/keys"
+}
+
+output "spiffe_trust_domain" {
+  description = "SPIFFE trust domain configured for this engine."
+  value       = var.trust_domain
 }
 
 output "validation_vault_username" {

@@ -17,29 +17,38 @@ locals {
   namespace_prefix = local.namespace_value == "" ? "" : "/${local.namespace_value}"
   vault_api_base   = "${trimsuffix(var.vault_addr, "/")}/v1${local.namespace_prefix}"
 
-  vault_identity_token_issuer  = data.terraform_remote_state.vault_setup.outputs.vault_identity_token_issuer
   userpass_auth_mount_accessor = data.terraform_remote_state.vault_setup.outputs.userpass_auth_mount_accessor
-  oidc_signing_key_name        = data.terraform_remote_state.vault_setup.outputs.vault_identity_oidc_key_name
+
+  spiffe_issuer = "${trimsuffix(var.jwt_issuer_base_url == "" ? var.vault_addr : var.jwt_issuer_base_url, "/")}/v1${local.namespace_prefix}/${var.spiffe_mount_path}"
 }
 
-# --- Vault OIDC role for Claude ---
+# --- Vault SPIFFE secrets engine for Claude ---
 
-resource "vault_identity_oidc_role" "claude" {
-  name      = var.role_name
-  key       = local.oidc_signing_key_name
-  template  = <<-EOT
-  {
-    "azp": {{identity.entity.aliases.${local.userpass_auth_mount_accessor}.name}},
-    "metadata": {{identity.entity.metadata}}
-  }
-  EOT
-  client_id = var.application_audience
-  ttl       = var.token_ttl_seconds
+resource "vault_mount" "spiffe" {
+  path        = var.spiffe_mount_path
+  type        = "spiffe"
+  description = "SPIFFE secrets engine for Claude WIF JWT-SVIDs"
 }
 
-resource "vault_identity_oidc_key_allowed_client_id" "claude" {
-  key_name          = local.oidc_signing_key_name
-  allowed_client_id = vault_identity_oidc_role.claude.client_id
+resource "vault_spiffe_secret_backend_config" "claude" {
+  mount                      = vault_mount.spiffe.path
+  trust_domain               = var.trust_domain
+  jwt_issuer_url             = local.spiffe_issuer
+  jwt_signing_algorithm      = var.jwt_signing_algorithm
+  key_lifetime               = var.key_lifetime
+  jwt_oidc_compatibility_mode = true
+}
+
+resource "vault_spiffe_secret_backend_role" "claude" {
+  mount = vault_mount.spiffe.path
+  name  = var.role_name
+  ttl   = var.token_ttl
+  template = jsonencode({
+    sub             = "spiffe://${var.trust_domain}/claude/{{identity.entity.aliases.${local.userpass_auth_mount_accessor}.name}}"
+    azp             = "{{identity.entity.aliases.${local.userpass_auth_mount_accessor}.name}}"
+    claude_workspace = "{{identity.entity.metadata.claude_workspace}}"
+  })
+  use_jti_claim = true
 }
 
 # --- Vault policy and validation user ---

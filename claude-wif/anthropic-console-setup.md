@@ -7,9 +7,9 @@ Follow these steps in the [Claude Console](https://console.anthropic.com) to con
 - A Claude Organisation must be initially created for Individual Claude accounts. 
   - [Claude Console](https://console.anthropic.com) -> User -> Organisation Settings 
 - Admin access to your Anthropic organization
-- The Vault OIDC issuer URL (output from `vault-setup/`):
+- The Vault SPIFFE issuer URL (output from `claude-wif/`):
   ```bash
-  terraform -chdir=vault-setup output vault_identity_token_issuer
+  terraform -chdir=claude-wif output spiffe_jwt_issuer
   ```
 
 ## Step 1: Create a service account
@@ -36,8 +36,8 @@ Follow these steps in the [Claude Console](https://console.anthropic.com) to con
 2. Click **Register issuer**.
 3. Configure:
    - **Name**: `vault-sandpit`
-   - **Issuer URL**: `https://vault.<your-zone>/v1/identity/oidc` (your Vault OIDC issuer URL)
-   - **JWKS source**: `OIDC discovery` (default) — Anthropic will fetch `/.well-known/openid-configuration` from the Vault OIDC issuer
+   - **Issuer URL**: `https://vault.<your-zone>/v1/spiffe` (your Vault SPIFFE engine issuer URL)
+   - **JWKS source**: `OIDC discovery` (default) — Anthropic will fetch `/.well-known/openid-configuration` from the SPIFFE engine
 4. Save and note the returned **`fdis_...`** ID.
 
 ## Step 4: Create a federation rule
@@ -53,11 +53,10 @@ Follow these steps in the [Claude Console](https://console.anthropic.com) to con
        ```
      - **Option B — CEL condition** (matches all Vault entities):
        ```
-       claims.iss == "https://vault.<your-zone>/v1/identity/oidc"
+       claims.iss == "https://vault.<your-zone>/v1/spiffe"
        ```
-     - **Option C — Exact subject**: Use the Vault entity ID of the user/service that will
-       authenticate (e.g., `810eb3f7-1e20-4098-5d09-c1747af563ba`). Find it with:
-       `vault read -field=id identity/entity/name/<username>`
+     - **Option C — Exact subject**: Use the SPIFFE ID of the workload (e.g.,
+       `spiffe://vault.example.com/claude/vault-claude-test-user`).
      - Audience: `https://api.anthropic.com`
    - **Target service account**: the `svac_...` ID from step 1
    - **Workspaces**: `wif-workspace` or `enable in all workspaces`

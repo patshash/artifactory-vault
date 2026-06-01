@@ -21,3 +21,4 @@ azure/.terraform.lock.hcl
 azure/AZURE-PLAN.md
 azure/original-mapping.md
 azure/AZURE.md
+claude-wif/.terraform.lock.hcl

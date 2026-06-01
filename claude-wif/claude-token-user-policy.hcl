@@ -1,3 +1,3 @@
-path "identity/oidc/token/claude-token-role" {
-  capabilities = ["read"]
+path "spiffe-claude/role/claude-token-role/mintjwt" {
+  capabilities = ["update"]
 }

@@ -5,7 +5,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/validate-vault-claude.sh [options]
 
-Requests a Vault identity token, exchanges it for an Anthropic access token
+Mints a SPIFFE JWT-SVID from Vault, exchanges it for an Anthropic access token
 via Workload Identity Federation (jwt-bearer grant), and then calls the Claude
 Messages API to verify end-to-end connectivity.
 
@@ -25,6 +25,8 @@ Optional:
   --vault-namespace / VAULT_NAMESPACE
   --vault-auth-path / VAULT_AUTH_PATH              Default: userpass
   --vault-role / VAULT_IDENTITY_ROLE               Default: claude-token-role
+  --spiffe-mount / VAULT_SPIFFE_MOUNT              Default: spiffe-claude
+  --audience / VAULT_SPIFFE_AUDIENCE               Default: https://api.anthropic.com
   --workspace-id / ANTHROPIC_WORKSPACE_ID
   --help
 EOF
@@ -156,6 +158,8 @@ else:
 
 VAULT_AUTH_PATH="${VAULT_AUTH_PATH:-userpass}"
 VAULT_IDENTITY_ROLE="${VAULT_IDENTITY_ROLE:-claude-token-role}"
+VAULT_SPIFFE_MOUNT="${VAULT_SPIFFE_MOUNT:-spiffe-claude}"
+VAULT_SPIFFE_AUDIENCE="${VAULT_SPIFFE_AUDIENCE:-https://api.anthropic.com}"
 
 # --- Parse arguments ---
 
@@ -175,6 +179,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --vault-role)
       VAULT_IDENTITY_ROLE="$2"
+      shift 2
+      ;;
+    --spiffe-mount)
+      VAULT_SPIFFE_MOUNT="$2"
+      shift 2
+      ;;
+    --audience)
+      VAULT_SPIFFE_AUDIENCE="$2"
       shift 2
       ;;
     --vault-token)
@@ -226,7 +238,7 @@ require_command python3
 [[ -n "${ANTHROPIC_FEDERATION_RULE_ID:-}" ]] || fail "ANTHROPIC_FEDERATION_RULE_ID or --federation-rule-id is required"
 
 info "Starting validation."
-info "This script will authenticate to Vault, request an identity token, exchange it with Anthropic via WIF, and call the Claude Messages API."
+info "This script will authenticate to Vault, mint a SPIFFE JWT-SVID, exchange it with Anthropic via WIF, and call the Claude Messages API."
 
 # --- Step 1: Authenticate to Vault ---
 
@@ -283,30 +295,39 @@ fi
 
 vault_headers+=(--header "X-Vault-Token: ${VAULT_TOKEN}")
 
-# --- Step 2: Request a Vault identity token ---
+# --- Step 2: Mint a SPIFFE JWT-SVID ---
 
-info "Step 2/4: Request a Vault identity token from role '${VAULT_IDENTITY_ROLE}'."
+info "Step 2/4: Mint a SPIFFE JWT-SVID from role '${VAULT_IDENTITY_ROLE}' (mount: ${VAULT_SPIFFE_MOUNT})."
+
+mintjwt_payload="$(
+  python3 -c "import json; print(json.dumps({'audience': '${VAULT_SPIFFE_AUDIENCE}'}))"
+)"
+
 show_command \
   curl \
   --header "Content-Type: application/json" \
   ${VAULT_NAMESPACE:+--header "X-Vault-Namespace: ${VAULT_NAMESPACE}"} \
   --header "X-Vault-Token: [REDACTED]" \
-  "${VAULT_ADDR%/}/v1/identity/oidc/token/$(url_encode "${VAULT_IDENTITY_ROLE}")"
+  --request POST \
+  --data "{\"audience\":\"${VAULT_SPIFFE_AUDIENCE}\"}" \
+  "${VAULT_ADDR%/}/v1/${VAULT_SPIFFE_MOUNT}/role/$(url_encode "${VAULT_IDENTITY_ROLE}")/mintjwt"
 
 identity_response="$(
   curl_request \
     "${vault_headers[@]}" \
-    "${VAULT_ADDR%/}/v1/identity/oidc/token/$(url_encode "${VAULT_IDENTITY_ROLE}")"
+    --request POST \
+    --data "${mintjwt_payload}" \
+    "${VAULT_ADDR%/}/v1/${VAULT_SPIFFE_MOUNT}/role/$(url_encode "${VAULT_IDENTITY_ROLE}")/mintjwt"
 )"
 vault_identity_token="$(printf '%s' "${identity_response}" | json_get 'data.token')"
 
-info "Vault identity token acquired."
-printf '    Vault identity token: %s\n' "${vault_identity_token}"
-decode_jwt "${vault_identity_token}" "Vault identity token"
+info "SPIFFE JWT-SVID acquired."
+printf '    JWT-SVID: %s\n' "${vault_identity_token}"
+decode_jwt "${vault_identity_token}" "SPIFFE JWT-SVID"
 
 # --- Step 3: Exchange the Vault identity token with Anthropic ---
 
-info "Step 3/4: Exchange the Vault identity token for an Anthropic access token via WIF."
+info "Step 3/4: Exchange the SPIFFE JWT-SVID for an Anthropic access token via WIF."
 
 exchange_payload="$(
   VAULT_JWT="${vault_identity_token}" \
