@@ -103,6 +103,37 @@ url_encode() {
   python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
 }
 
+decode_jwt() {
+  local token="$1"
+  local label="${2:-JWT}"
+  python3 - "${token}" "${label}" <<'PY'
+import base64
+import json
+import sys
+
+token = sys.argv[1]
+label = sys.argv[2]
+
+parts = token.split(".")
+if len(parts) < 2:
+    print(f"    {label}: not a valid JWT (expected 3 parts, got {len(parts)})")
+    sys.exit(0)
+
+def decode_part(part):
+    padding = 4 - len(part) % 4
+    part += "=" * padding
+    return json.loads(base64.urlsafe_b64decode(part))
+
+header = decode_part(parts[0])
+payload = decode_part(parts[1])
+
+print(f"    {label} header:")
+print(f"      {json.dumps(header, indent=6)}")
+print(f"    {label} payload:")
+print(f"      {json.dumps(payload, indent=6)}")
+PY
+}
+
 json_get() {
   local expression="$1"
   python3 -c '
@@ -271,6 +302,7 @@ vault_identity_token="$(printf '%s' "${identity_response}" | json_get 'data.toke
 
 info "Vault identity token acquired."
 printf '    Vault identity token: %s\n' "${vault_identity_token}"
+decode_jwt "${vault_identity_token}" "Vault identity token"
 
 # --- Step 3: Exchange the Vault identity token with Anthropic ---
 
@@ -319,6 +351,8 @@ anthropic_token="$(printf '%s' "${exchange_response}" | json_get 'access_token')
 [[ -n "${anthropic_token}" ]] || fail "Anthropic did not return an access token"
 
 info "Anthropic access token acquired."
+printf '    Anthropic access token: %s\n' "${anthropic_token}"
+decode_jwt "${anthropic_token}" "Anthropic access token"
 
 # --- Step 4: Call the Claude Messages API ---
 

@@ -50,3 +50,9 @@ variable "validation_password_length" {
   type        = number
   default     = 24
 }
+
+variable "claude_workspace_name" {
+  description = "Value for the claude_workspace metadata on the validation user's Vault entity. Used by Anthropic federation rules for workspace routing."
+  type        = string
+  default     = "wif-workspace"
+}

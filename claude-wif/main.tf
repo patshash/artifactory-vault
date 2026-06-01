@@ -49,6 +49,13 @@ resource "vault_policy" "claude_token_user" {
   policy = file("${path.module}/claude-token-user-policy.hcl")
 }
 
+resource "vault_identity_entity" "validation_user" {
+  name = var.validation_username
+  metadata = {
+    claude_workspace = var.claude_workspace_name
+  }
+}
+
 resource "random_password" "validation_user" {
   length  = var.validation_password_length
   special = false
@@ -63,5 +70,11 @@ resource "vault_generic_endpoint" "validation_user" {
   ignore_absent_fields = true
 
   depends_on = [vault_policy.claude_token_user]
+}
+
+resource "vault_identity_entity_alias" "validation_user" {
+  name           = var.validation_username
+  mount_accessor = local.userpass_auth_mount_accessor
+  canonical_id   = vault_identity_entity.validation_user.id
 }
 
