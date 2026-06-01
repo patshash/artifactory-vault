@@ -49,10 +49,10 @@ variable "jwt_signing_algorithm" {
   }
 }
 
-variable "key_lifetime_seconds" {
-  description = "How often the SPIFFE engine rotates its signing key, in seconds."
-  type        = number
-  default     = 86400
+variable "key_lifetime" {
+  description = "How often the SPIFFE engine rotates its signing key (Vault duration string, e.g. \"24h\")."
+  type        = string
+  default     = "24h"
 }
 
 variable "role_name" {
@@ -67,10 +67,10 @@ variable "application_audience" {
   default     = "https://api.anthropic.com"
 }
 
-variable "token_ttl_seconds" {
-  description = "TTL for JWT-SVIDs issued from the role, in seconds. Maximum 86400 per Anthropic."
-  type        = number
-  default     = 3600
+variable "token_ttl" {
+  description = "TTL for JWT-SVIDs issued from the role (Vault duration string, e.g. \"1h\"). Maximum 24h per Anthropic."
+  type        = string
+  default     = "1h"
 }
 
 variable "validation_username" {
